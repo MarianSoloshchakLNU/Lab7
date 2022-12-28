@@ -6,11 +6,16 @@ import {CellStateEnum} from './cell-state.enum';
 export class Worker {
   public direction?: Direction;
   public currentPosition: ICoordinates = {x: 0, y: 0};
+  public startPosition: ICoordinates = {x: 0, y: 0};
   public aim: ICoordinates = {x: 0, y: 0};
 
   public log: Array<string> = [];
 
   public turnDirection: 'right' | 'left' = 'right';
+
+  bEnd = false;
+  workerTimeout: number;
+  cancelExecution = false;
 
   get borderLeft() {
     return this.currentPosition.x === 0;
@@ -78,14 +83,14 @@ export class Worker {
     return this.currentPosition.x === this.aim.x && this.currentPosition.y === this.aim.y;
   }
 
-  constructor(public flat: GameFlat, initialTurnDirection: 'left' | 'right') {
-    this.turnDirection = initialTurnDirection;
+  constructor(public flat: GameFlat, timeout?: number) {
     const startPosition = flat.getStartPosition();
     const finishPosition = flat.getFinishPosition();
     this.setPos(startPosition.x, startPosition.y);
+    this.setStartPos(startPosition.x, startPosition.y);
     this.setAim(finishPosition.x, finishPosition.y);
 
-    this.calcNextDirRight();
+    this.workerTimeout = timeout ? timeout : 100;
   }
 
   setPos(x: number, y: number) {
@@ -94,7 +99,16 @@ export class Worker {
       y
     };
 
-    this.flat.config[y][x] = CellStateEnum.Visited;
+    this.flat.config[y][x].visited = true;
+  }
+
+  setStartPos(x: number, y: number) {
+    this.startPosition = {
+      x,
+      y
+    };
+
+    this.flat.config[y][x].visited = true;
   }
 
   setAim(x: number, y: number) {
@@ -104,108 +118,9 @@ export class Worker {
     };
   }
 
-  setDir(dir: Direction) {
-    this.direction = dir;
-  }
-
-  step1() {
-    const nextCell = this.nextCell;
-
-    if (this.cellXYIsFree(nextCell.x, nextCell.y)) {
-      this.setPos(nextCell.x, nextCell.y);
-    }
-  }
-
-  turnRight(): Direction {
-    switch (this.direction) {
-      case Direction.xminus:
-        return Direction.xminusyminus;
-      case Direction.xminusyminus:
-        return Direction.yminus;
-      case Direction.yminus:
-        return Direction.xplusyminus;
-      case Direction.xplusyminus:
-        return Direction.xplus;
-      case Direction.xplus:
-        return Direction.xplusyplus;
-      case Direction.xplusyplus:
-        return Direction.yplus;
-      case Direction.yplus:
-        return Direction.xminusyplus;
-      case Direction.xminusyplus:
-        return Direction.xminus;
-      default:
-        return this.direction;
-    }
-  }
-
-  turnLeft(): Direction {
-    switch (this.direction) {
-      case Direction.xminus:
-        return Direction.xminusyplus;
-      case Direction.xminusyplus:
-        return Direction.yplus;
-      case Direction.yplus:
-        return Direction.xplusyplus;
-      case Direction.xplusyplus:
-        return Direction.xplus;
-      case Direction.xplus:
-        return Direction.xplusyminus;
-      case Direction.xplusyminus:
-        return Direction.yminus;
-      case Direction.yminus:
-        return Direction.xminusyminus;
-      case Direction.xminusyminus:
-        return Direction.xminus;
-      default:
-        return this.direction;
-    }
-  }
-
-  calcNextDirRight() {
-    this.log.push('----------------------');
-    if (!this.borderRight) {
-      if ((this.aim.x - this.currentPosition.x) >= Math.abs(this.aim.y - this.currentPosition.y)) {
-        this.direction = Direction.xplus;
-      } else if (this.aim.y < this.currentPosition.y){
-        this.direction = Direction.xplusyminus;
-      } else if (this.aim.y > this.currentPosition.y) {
-        this.direction = Direction.xplusyplus;
-      }
-    } else {
-      this.direction = this.aim.y > this.currentPosition.y ? Direction.yplus : Direction.yminus;
-    }
-
-    this.log.push('Current position - { x:' + this.currentPosition.x + ', y:' + this.currentPosition.y + ' }');
-    this.log.push('Direction is - ' + this.direction);
-
-    let infinityLoopFuse = 0;
-
-    while (!this.cellFrontIsFree && infinityLoopFuse < 10) {
-      this.log.push('Next cell is disabled, turning ' + this.turnDirection);
-      infinityLoopFuse++;
-
-      if (this.isNextCellOutOfFlat() && this.borderBelow) {
-        this.log.push('switching to left turn');
-        this.turnDirection = 'left';
-      }
-
-      if (this.isNextCellOutOfFlat() && this.borderTop) {
-        this.log.push('switching to right turn');
-        this.turnDirection = 'right';
-      }
-
-      this.direction = this.turnDirection === 'left' ? this.turnLeft() : this.turnRight();
-
-      this.log.push('Direction is - ' + this.direction);
-    }
-
-    this.log.push('Next cell is available');
-  }
-
   cellXYIsFree(x: number, y: number) {
     return (x < this.flat.config[0].length && x >= 0 && y < this.flat.config.length && y >= 0) &&
-      this.flat.config[y][x] !== CellStateEnum.Disabled;
+      this.flat.config[y][x].state !== CellStateEnum.Disabled;
   }
 
   isNextCellOutOfFlat() {
@@ -214,5 +129,94 @@ export class Worker {
       nextCell.y >= this.flat.config.length || nextCell.y < 0;
   }
 
+
+  checkPoints(p: Array<ICoordinates>, iteration: number) {
+
+    if (iteration >= 1000) {
+      this.log.push('Circular loop error, stop execution');
+      return;
+    }
+
+    let count = p.length;
+    let points = new Array<ICoordinates>();
+
+    if(count==0 || this.bEnd) return;
+
+    for(let i=0;i<count;++i)
+    {
+      //если достигли конца, то тикаем
+      if(p[i].x == this.aim.x && p[i].y == this.aim.y)
+      {
+        this.log.push('Found the shortest end, stop execution');
+        this.bEnd = true;
+        return;
+      }
+
+      // check nearest 8 cells
+      for(let y=-1;y<=1;++y) {
+        for(let x=-1;x<=1;++x) {
+          if(!(x==0&&y==0))
+            //проверка на выход за пределы поля
+            if(this.checkPointLimit(p[i].x+y,p[i].y+x)) {
+              if(this.flat.config[p[i].y+x][p[i].x+y].state !== CellStateEnum.Disabled && !this.flat.config[p[i].y+x][p[i].x+y].value)
+              {
+                //проверка на препятствия
+                if(this.checkPointObstacle(p[i].x+y, p[i].y+x,p[i].x, p[i].y))
+                {
+                  //проверка значения
+                  if(this.checkPointValue(p[i].x+y,p[i].y+x,  (this.flat.config[p[i].y][p[i].x].value ?? 0) +((Math.abs(x)==Math.abs(y))?1.6:1), points))
+                    //если надо, рисуем волны
+                  {
+                  }
+                }
+              }
+            }
+        }
+      }
+
+    }
+
+    if (!this.cancelExecution) {
+      //повторяем для новых клеток
+      setTimeout(() => {
+        this.log.push('checked all points, switching to other');
+        this.checkPoints(points, iteration++)
+      }, this.workerTimeout);
+    }
+  }
+
+  checkPointLimit(i: number, j: number)
+  {
+    return (!(i < 0 || j < 0 || i >= this.flat.config[0].length || j >= this.flat.config.length));
+  }
+
+  checkPointObstacle(i1: any,j1: any, i2: any, j2: any)
+  {
+    return (!((Math.abs(i1 - i2) + Math.abs(j1 - j2) == 2) && (this.flat.config[j2][i1].state == CellStateEnum.Disabled || this.flat.config[j1][i2].state == CellStateEnum.Disabled)));
+  }
+
+  checkPointValue(i: any,j: any, v: any, p: Array<ICoordinates>)
+  {
+    if(!(this.startPosition.x==i && this.startPosition.y==j))
+      if(this.flat.config[j][i].state!==CellStateEnum.Disabled)
+      {
+        if(this.flat.config[j][i].state !== CellStateEnum.Disabled)
+          p[p.length] = {x:i,y:j};
+        if(!this.flat.config[j][i].value || this.flat.config[j][i].value>v)
+        {
+          this.flat.config[j][i].value = +v.toFixed(1);
+          this.log.push('Point [' + j + ',' + i + '] value - ' + this.flat.config[j][i].value);
+          return true;
+        }
+
+        return false;
+      }
+
+    return false;
+  }
+
+  stop() {
+    this.cancelExecution = true;
+  }
 
 }

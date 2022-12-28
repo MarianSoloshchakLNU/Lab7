@@ -1,11 +1,12 @@
 <div class="top-buttons">
   <div class="load-buttons">
     <input type="file" (change)="onFileChange($event.target)">
-    <button (click)="loadDefaultConfigFile()">Use default file</button>
-    <button (click)="loadDefaultEmptyConfigFile()">Use default empty file</button>
+    <button (click)="loadDefaultConfigFile()">Use v1 file</button>
+    <button (click)="loadSecondConfigFile()">Use v2 file</button>
   </div>
 
   <button *ngIf="defaultFileData" (click)="onDownloadDefaultFile()">Download default file</button>
+  <button *ngIf="defaultFileData" (click)="onDownloadCurrentState()">Download current state</button>
 </div>
 
 
@@ -23,22 +24,18 @@
         <input id="timeout" type="number" placeholder="timeout" [(ngModel)]="workerTimeout">
       </div>
 
-      <label>Choose turn direction:</label>
-      <div>
-        <input type="radio" id="leftTurn"
-               name="turnDirection" value="left" [(ngModel)]="workerTurnDirection">
-        <label for="leftTurn">Left</label>
+      <button (click)="createWorker()" *ngIf="!changingStartPoint">Start worker</button>
 
-        <input type="radio" id="rightTurn"
-               name="turnDirection" value="right" [(ngModel)]="workerTurnDirection">
-        <label for="rightTurn">Right</label>
-      </div>
-
-      <button (click)="createWorker()">Start worker</button>
+      <button (click)="changingStartPoint = true" *ngIf="!changingStartPoint && !changingEndPoint">Change start point</button>
+      <button (click)="changingEndPoint = true" *ngIf="!changingStartPoint && !changingEndPoint">Change end point</button>
+      <div *ngIf="changingStartPoint && !changingEndPoint">Click on any point to set start position</div>
+      <div *ngIf="changingEndPoint && !changingStartPoint">Click on any point to set finish position</div>
     </div>
 
     <div class="game-config" *ngIf="worker">
       <button (click)="createGame()">Reset</button>
+
+      <button *ngIf="worker" (click)="worker.stop()">Stop</button>
 
       <ng-container *ngIf="worker.log">
         <h2>Log:</h2>
@@ -52,13 +49,13 @@
   <div class="flat">
     <div class="row" *ngFor="let row of gameFlat.config">
       <div class="cell"
-           [ngClass]="{'disabled': cell === cellStateEnum.Disabled,
-           'start': cell === cellStateEnum.Start,
-           'visited': cell === cellStateEnum.Visited,
-           'finish': cell === cellStateEnum.Finish,
-           'completed': worker?.completed && cell === cellStateEnum.Visited}"
-           *ngFor="let cell of row">
-
+           [ngClass]="{'disabled': cell.state === cellStateEnum.Disabled,
+           'start': cell.state === cellStateEnum.Start,
+           'visited': cell.visited,
+           'finish': cell.state === cellStateEnum.Finish,
+           'completed': worker?.completed && cell.visited}"
+           *ngFor="let cell of row" (click)="onCellStateChange($event, cell)">
+        {{cell.value}}
       </div>
     </div>
   </div>

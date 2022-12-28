@@ -4,6 +4,8 @@ import {GameFlat} from './models/game-flat';
 import {HttpClient} from '@angular/common/http';
 import {DomSanitizer} from '@angular/platform-browser';
 import {Worker} from './models/worker';
+import {Cell} from "./models/cell";
+import {ICoordinates} from "./models/coordinates";
 
 @Component({
   selector: 'app-root',
@@ -13,7 +15,7 @@ import {Worker} from './models/worker';
 export class AppComponent implements OnInit {
   title = 'Lab6';
 
-  flatConfig: Array<Array<CellStateEnum>> = [];
+  flatConfig: Array<Array<Cell>> = [];
 
   gameFlat?: GameFlat;
   cellStateEnum = CellStateEnum;
@@ -22,9 +24,10 @@ export class AppComponent implements OnInit {
   worker?: Worker;
   workerJob?: any;
 
-  workerTimeout = 100;
-  workerTurnDirection: 'left' | 'right' = 'right';
+  workerTimeout = 50;
   workerLoopFuse = 0;
+  changingStartPoint = false;
+  changingEndPoint = false;
 
   constructor(private httpClient: HttpClient, private sanitizer: DomSanitizer ) {
   }
@@ -52,18 +55,18 @@ export class AppComponent implements OnInit {
       return;
     }
     // Create an array consisting of the lines in the file
-    const contents = data?.replace(/(\r\n|\n|\r)/gm, "").split(',').filter(x => x);
+    const contents = data.replace(/(\r\n|\n|\r)/gm, ",").split(',').filter(x => x);
 
     this.flatConfig = [];
 
     let i = 0;
     while (i < contents.length)
     {
-      let valueToPush: Array<CellStateEnum> = [];
+      let valueToPush: Array<Cell> = [];
 
       for (let j = 0; j < contents[i].length; j++) {
         const value = parseFloat(contents[i][j]);
-        valueToPush[j] = Object.values(CellStateEnum).includes(value) ? value: CellStateEnum.Available
+        valueToPush[j] = new Cell(Object.values(CellStateEnum).includes(value) ? value: CellStateEnum.Available);
       }
 
       this.flatConfig.push(valueToPush);
@@ -99,8 +102,8 @@ export class AppComponent implements OnInit {
       });
   }
 
-  loadDefaultEmptyConfigFile() {
-    this.httpClient.get('assets/config-empty.txt', {responseType: 'text'})
+  loadSecondConfigFile() {
+    this.httpClient.get('assets/config-v2.txt', {responseType: 'text'})
       .subscribe(data => {
         this.parseFileDataIntoFlat(data);
         this.createGame();
@@ -118,24 +121,52 @@ export class AppComponent implements OnInit {
     a.click();
   }
 
+  onDownloadCurrentState () {
+    const stateData = this.flatConfig.map(x => x.map(c => c.state).join('')).join('\n')
+
+    const blob = new Blob([stateData], { type: 'application/octet-stream' });
+
+
+    const a = document.createElement('a');
+
+    a.download = 'config.txt';
+    a.href = window.URL.createObjectURL(blob);
+    a.click();
+  }
+
   createWorker() {
     if (!this.gameFlat) {
       return;
     }
-    this.worker = new Worker(this.gameFlat, this.workerTurnDirection);
+    this.worker = new Worker(this.gameFlat, this.workerTimeout);
     this.workerLoopFuse = 0;
 
-    this.workerJob = setInterval(this.nextStep.bind(this), this.workerTimeout);
+    console.log(this.gameFlat)
+    const startPoint: Array<ICoordinates> =[ {x: this.gameFlat.getStartPosition().x, y: this.gameFlat.getStartPosition().y }]
+
+    this.worker.checkPoints(startPoint, 0);
   }
 
-  nextStep() {
-    this.workerLoopFuse++;
-
-    this.worker.step1();
-    this.worker.calcNextDirRight();
-
-    if (this.workerLoopFuse >= this.flatConfig[0].length * this.flatConfig.length || this.worker.completed) {
-      clearInterval(this.workerJob);
+  onCellStateChange(event: any, cell: Cell) {
+    if (this.changingStartPoint && !(cell.state === CellStateEnum.Start || cell.state === CellStateEnum.Finish)) {
+      const start = this.gameFlat.getStartPosition();
+      this.gameFlat.config[start.y][start.x].state = CellStateEnum.Available;
+      cell.state = CellStateEnum.Start;
+      this.changingStartPoint = false;
+      return;
     }
+    if (this.changingEndPoint && !(cell.state === CellStateEnum.Start || cell.state === CellStateEnum.Finish)) {
+      const end = this.gameFlat.getFinishPosition();
+      console.log(end)
+      this.gameFlat.config[end.y][end.x].state = CellStateEnum.Available;
+      cell.state = CellStateEnum.Finish;
+      this.changingEndPoint = false;
+      return;
+    }
+    if (!this.worker && cell.state === CellStateEnum.Available || cell.state === CellStateEnum.Disabled) {
+      cell.state =  cell.state === CellStateEnum.Disabled ? CellStateEnum.Available : CellStateEnum.Disabled;
+    }
+    event.stopPropagation();
+    event.preventDefault();
   }
 }
