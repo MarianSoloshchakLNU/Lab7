@@ -8,13 +8,14 @@ import {FormsModule} from '@angular/forms';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBHBsHN2_deJxSF3IFiaixY7Qii1sLH-t0",
-  authDomain: "l6-algoritms.firebaseapp.com",
-  projectId: "l6-algoritms",
-  storageBucket: "l6-algoritms.appspot.com",
-  messagingSenderId: "173058638424",
-  appId: "1:173058638424:web:df580a368d968b2934c02d"
+  apiKey: "AIzaSyCRwl7_IPUNmArioo9Wtq0Zr1_lKr_ywEo",
+  authDomain: "lab7-b1f5c.firebaseapp.com",
+  projectId: "lab7-b1f5c",
+  storageBucket: "lab7-b1f5c.appspot.com",
+  messagingSenderId: "92037564013",
+  appId: "1:92037564013:web:48d0fb880ad83265246164"
 };
+
 
 @NgModule({
   declarations: [
