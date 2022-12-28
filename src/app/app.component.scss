@@ -1,0 +1,101 @@
+.flat-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 60px 0;
+  margin-top: 30px;
+  background: #f6f6f6;
+
+  .tools-panel {
+    width: 300px;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .worker-config, .game-config {
+      display: flex;
+      flex-direction: column;
+
+      >* {
+        margin-bottom: 20px;
+      }
+
+      .log {
+        height: 500px;
+        overflow-y: auto;
+        font-size: 14px;
+        padding: 10px;
+        border: 1px solid #676767;
+
+        .item {
+          margin-bottom: 2px;
+        }
+      }
+    }
+  }
+
+  .flat {
+    border: 1px solid #676767;
+
+    .row {
+      display: flex;
+      border-bottom: 1px solid #676767;
+
+      .cell {
+        width: 35px;
+        height: 35px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-right: 1px solid #676767;
+        background: #e5e5e5;
+
+        &.disabled {
+          background: #818181;
+        }
+
+        &.start {
+          background: green;
+        }
+
+        &.visited {
+          background: blue;
+        }
+
+        &.finish {
+          background: red;
+        }
+
+        &.completed {
+          background: red;
+        }
+
+        &:last-child {
+          border-right: none;
+        }
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+  }
+}
+
+.top-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 10px;
+
+  .load-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    >* {
+      margin-right: 10px;
+    }
+  }
+}
